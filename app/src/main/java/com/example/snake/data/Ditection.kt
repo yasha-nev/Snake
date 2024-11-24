@@ -1,5 +1,5 @@
 package com.example.snake.data
 
-enum class Direction{
-    up, down, right, left
+enum class Direction {
+    Up, Down, Right, Left
 }

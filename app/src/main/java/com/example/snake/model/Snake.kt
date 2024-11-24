@@ -1,31 +1,35 @@
 package com.example.snake.model
 
-import kotlinx.coroutines.Dispatchers
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import com.example.snake.data.Direction
 import com.example.snake.data.SnakeState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
-class Snake (displayWidth: Int, displayHeight: Int): ViewModel(){
+class Snake(displayWidth: Int, displayHeight: Int) : ViewModel() {
 
-    val mapWidth : Int = displayWidth / 25
-    val mapHeight : Int = displayHeight / 25
+    val mapWidth: Int = displayWidth / 25
+    val mapHeight: Int = displayHeight / 25
 
-    private var _state = MutableStateFlow(SnakeState(
-        fruit = Pair<Int, Int> (0, mapWidth / 2),
-        direction =  Direction.up,
-        body = listOf(Pair<Int, Int> (2, 5)),
-        gameOver = false
-    ))
+    private val newDirection = MutableStateFlow(Direction.Up)
+
+    private var _state = MutableStateFlow(
+        SnakeState(
+            fruit = Pair(mapHeight / 2, mapWidth / 2),
+            direction = Direction.Up,
+            body = listOf(Pair(2, 5)),
+            gameOver = false
+        )
+    )
 
     val state: StateFlow<SnakeState> get() = _state
 
-    init{
+    init {
         viewModelScope.launch(Dispatchers.IO) {
             while (true) {
                 update()
@@ -34,22 +38,21 @@ class Snake (displayWidth: Int, displayHeight: Int): ViewModel(){
         }
     }
 
-    fun update(){
-        if (_state.value.gameOver == true){
+    private fun update() {
+        if (_state.value.gameOver) {
             return
         }
 
         val currentBody = _state.value.body
-        val direction = _state.value.direction
-        val head = currentBody.get(0)
+        val direction = newDirection.value
+        val head = currentBody[0]
         val newBody = mutableListOf(head)
         val eatFruit = checkEatFruit()
 
-        val newFruit = if (eatFruit) Pair<Int, Int> ((0..mapWidth).random(), (0..mapHeight).random())
-        else _state.value.fruit
+        val newFruit = if (eatFruit) updateFruit() else _state.value.fruit
 
-        for ((index, peace) in currentBody.withIndex()){
-            if ((index == currentBody.size - 1) and (!eatFruit) ){
+        for ((index, peace) in currentBody.withIndex()) {
+            if ((index == currentBody.size - 1) and (!eatFruit)) {
                 break
             }
 
@@ -58,111 +61,118 @@ class Snake (displayWidth: Int, displayHeight: Int): ViewModel(){
 
         newBody[0] = makeMove(head, direction)
 
-        val newGameOver = if (checkGameOver() == true) true
-        else false
-
         _state.update {
             SnakeState(
                 fruit = newFruit,
                 direction = direction,
                 body = newBody,
-                gameOver = newGameOver
+                gameOver = checkGameOver()
             )
         }
     }
 
-    fun makeMove(head : Pair<Int, Int>, direction: Direction) : Pair<Int, Int>{
-        var x : Int
-        var y : Int
+    private fun makeMove(head: Pair<Int, Int>, direction: Direction): Pair<Int, Int> {
+        var x: Int
+        var y: Int
 
-        if (direction == Direction.up){
-            x = head.first
-            y = head.second - 1
-        }
-        else if (direction == Direction.down) {
-            x = head.first
-            y = head.second + 1
-        }
-        else if (direction == Direction.left){
-            x = head.first - 1
-            y = head.second
-        }
-        else if (direction == Direction.right) {
-            x = head.first + 1
-            y = head.second
-        }
-        else {
-            x = head.first
-            y = head.second
+        when (direction) {
+            Direction.Up -> {
+                x = head.first
+                y = head.second - 1
+            }
+
+            Direction.Down -> {
+                x = head.first
+                y = head.second + 1
+            }
+
+            Direction.Left -> {
+                x = head.first - 1
+                y = head.second
+            }
+
+            Direction.Right -> {
+                x = head.first + 1
+                y = head.second
+            }
         }
 
-        if (x < 0){
+        if (x < 0) {
             x = mapWidth
-        } else if (x > mapWidth){
+        } else if (x > mapWidth) {
             x = 0
-        } else if (y < 0){
+        } else if (y < 0) {
             y = mapHeight
-        } else if (y > mapHeight){
+        } else if (y > mapHeight) {
             y = 0
         }
 
-        return Pair<Int, Int> (x, y)
+        return Pair(x, y)
     }
 
-    fun reset(){
+    fun reset() {
         _state.update {
             SnakeState(
-                fruit = Pair<Int, Int> (0, mapHeight / 2),
-                direction =  Direction.up,
-                body = listOf(Pair<Int, Int> (0, 0)),
+                fruit = Pair(mapHeight / 2, mapWidth / 2),
+                direction = Direction.Up,
+                body = listOf(Pair(0, 0)),
                 gameOver = false
             )
         }
     }
 
-    fun updateDiraction(direction: Direction){
+    fun updateDirection(direction: Direction) {
         val curDirection = _state.value.direction
-        if (direction == curDirection){
+        if (direction == curDirection) {
             return
         }
 
-        if (((direction == Direction.up) && (curDirection == Direction.down)) or
-            ((direction == Direction.down) && (curDirection == Direction.up))){
+        if (((direction == Direction.Up) && (curDirection == Direction.Down)) or
+            ((direction == Direction.Down) && (curDirection == Direction.Up))
+        ) {
             return
         }
 
-        if (((direction == Direction.left) && (curDirection == Direction.right)) or
-            ((direction == Direction.right) && (curDirection == Direction.left))){
+        if (((direction == Direction.Left) && (curDirection == Direction.Right)) or
+            ((direction == Direction.Right) && (curDirection == Direction.Left))
+        ) {
             return
         }
 
-        _state.update {
-            SnakeState(
-                fruit = _state.value.fruit,
-                gameOver = _state.value.gameOver,
-                body = _state.value.body,
-                direction = direction
-            )
-        }
+        newDirection.value = direction
     }
 
-    fun checkEatFruit() : Boolean{
-        val head = _state.value.body.get(0)
-        val fruit = _state.value.fruit
-
-        if (head == fruit){
-            return true
-        }
-
-        return false
-    }
-
-    fun checkGameOver() : Boolean{
+    private fun updateFruit(): Pair<Int, Int> {
         val curBody = _state.value.body
-        val head = curBody.get(0)
 
-        for ((index, position) in curBody.withIndex()){
-            if (index != 0 && position == head){
+        while (true) {
+            val newFruit: Pair<Int, Int> = Pair((0..mapWidth).random(), (0..mapHeight).random())
+
+            var flag = true
+            for (position in curBody.withIndex()) {
+                if (position.value == newFruit) {
+                    flag = false
+                }
+            }
+
+            if (flag) {
+                return newFruit
+            }
+        }
+    }
+
+    private fun checkEatFruit(): Boolean {
+        val head = _state.value.body[0]
+        val fruit = _state.value.fruit
+        return head == fruit
+    }
+
+    private fun checkGameOver(): Boolean {
+        val curBody = _state.value.body
+        val head = curBody[0]
+
+        for ((index, position) in curBody.withIndex()) {
+            if (index != 0 && position == head) {
                 return true
             }
         }
